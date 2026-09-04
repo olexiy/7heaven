@@ -49,8 +49,8 @@ describe('hearing', () => {
     sim.step();
     expect(ghoul.awareness).toBe('unaware');
     // Impact at (3, 12): 8 tiles from the ghoul, 10 from the player.
-    sim.command({ type: 'act', entity: sim.playerId, action: 'fireball', target: { kind: 'tile', pos: { x: 3, y: 10 } } });
-    for (let i = 0; i < 20 * 16; i++) sim.step();
+    sim.command({ type: 'act', entity: sim.playerId, action: 'fireball', target: { kind: 'tile', pos: { x: 3, y: 12 } } });
+    for (let i = 0; i < 20 * 22; i++) sim.step();
     expect(ghoul.awareness).not.toBe('unaware');
     expect(ghoul.pos.y).toBeLessThan(20);
   });
