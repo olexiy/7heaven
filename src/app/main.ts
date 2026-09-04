@@ -8,7 +8,7 @@ import { TimeController, type Speed } from './loop';
 import { PHASE_NAMES } from '../data/actions';
 import { TICKS_PER_SEC } from '../core/time';
 
-const ENEMIES = ['ghoul', 'ghoulKeen', 'ghoul'];
+const ENEMIES = ['ghoul', 'ghoulKeen', 'ghoul', 'shaman'];
 
 function seedFromUrl(): number {
   const s = new URLSearchParams(location.search).get('seed');
@@ -23,6 +23,7 @@ class Game {
   readonly time = new TimeController();
   hover: Vec | null = null;
   targeting: string | null = null;
+  pauseOnAbility = true;
   private lastFrame = 0;
   private ended = false;
   private nowMs = 0;
@@ -35,6 +36,8 @@ class Game {
       onCancel: (c) => this.cancel(c),
       onAutopilot: () => this.sim.command({ type: 'autopilot', on: !this.sim.autopilot }),
       onAutoFast: () => (this.time.autoFast = !this.time.autoFast),
+      onAutoAttack: () => this.sim.command({ type: 'autoAttack', on: !this.sim.autoAttack }),
+      onPauseOnAbility: () => (this.pauseOnAbility = !this.pauseOnAbility),
       onLeave: () => {
         this.sim.leave();
         this.hud.hideOverlay();
@@ -132,6 +135,12 @@ class Game {
           break;
         case 'KeyR':
           this.selectAction('fireball');
+          break;
+        case 'KeyF':
+          this.selectAction('shieldBash');
+          break;
+        case 'KeyT':
+          this.sim.command({ type: 'autoAttack', on: !this.sim.autoAttack });
           break;
         case 'KeyA':
           this.sim.command({ type: 'autopilot', on: !this.sim.autopilot });
@@ -240,7 +249,7 @@ class Game {
       nowMs: t,
     });
     const fastNow = !this.time.paused && this.time.effectiveSpeed() > this.time.speed;
-    this.hud.update(sim, this.time.paused, this.time.speed, this.targeting, this.hover, this.time.autoFast, fastNow);
+    this.hud.update(sim, this.time.paused, this.time.speed, this.targeting, this.hover, this.time.autoFast, fastNow, this.pauseOnAbility);
   }
 
   /** Calm = no enemy in sight and the player is busy with something long (walking, casting). */
@@ -285,9 +294,23 @@ class Game {
         if (ent) this.renderer.addFloat(ent.pos, e.reason === 'dodge' ? 'уклонился' : 'мимо', '#9aa3b8', this.nowMs);
         break;
       }
-      case 'blocked':
-        this.hud.log(`Щит поглотил ${e.absorbed}`, 'good');
+      case 'blocked': {
+        const ent = sim.entities.get(e.target);
+        if (e.full && ent) this.renderer.addFloat(ent.pos, 'блок!', '#4cc9f0', this.nowMs);
+        this.hud.log(e.full ? `Щит отбил удар (${e.absorbed})` : `Щит поглотил ${e.absorbed}`, 'good');
         break;
+      }
+      case 'actionStarted': {
+        // An enemy in sight starts an ability: give the player a moment to read the ring.
+        if (this.pauseOnAbility && !isPlayer(e.id) && sim.actionDef(e.action).category === 'ability') {
+          const ent = sim.entities.get(e.id);
+          if (ent && sim.player.visible.has(sim.map.idx(ent.pos.x, ent.pos.y))) {
+            this.time.paused = true;
+            this.hud.log(`${this.name(e.id)} начинает: ${sim.actionDef(e.action).name}`, 'warn');
+          }
+        }
+        break;
+      }
       case 'interrupted':
         this.hud.log(`${this.name(e.attacker)} сбил ${sim.actionDef(e.action).name.toLowerCase()} у ${this.name(e.target)}`, 'warn');
         break;

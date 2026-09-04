@@ -5,6 +5,7 @@ import { clamp01, resolveParam, type RuleContext, type TraceEntry } from './modi
 import { collectModifiers } from './collect';
 import { BASE } from '../../data/rules';
 import { chebyshev } from '../world/map';
+import { isBlindTo } from '../action/resolve';
 
 export type RiskLevel = 'sure' | 'risky' | 'hopeless';
 
@@ -53,7 +54,7 @@ export function assessAction(sim: Sim, actor: Entity, def: ActionDef, target?: E
   }
   if (def.kind === 'melee') {
     if (!target) return { level: 'hopeless', chance: 0, causes: ['noTarget'] };
-    const targetBlind = !target.visible.has(sim.map.idx(actor.pos.x, actor.pos.y));
+    const targetBlind = isBlindTo(sim, target, actor.pos);
     const ctx: RuleContext = { actor, target, action: def, targetBlind };
     const mods = collectModifiers(ctx);
     const hit = resolveParam('hitChance', BASE.hitChance, ctx, mods);

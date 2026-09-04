@@ -41,13 +41,29 @@ export function grantXp(sim: Sim, actor: Entity, skill: SkillId, difficulty: num
   sim.emit({ type: 'xp', id: actor.id, skill, amount: gain, levelUp });
 }
 
+/** The target is blind to the attacker if it cannot see the tile or the attacker is behind it. */
+export function isBlindTo(sim: Sim, target: Entity, attackerPos: { x: number; y: number }): boolean {
+  return !target.visible.has(sim.map.idx(attackerPos.x, attackerPos.y)) || target.isBehind(attackerPos.x, attackerPos.y);
+}
+
 function applyDamage(sim: Sim, attacker: Entity, target: Entity, raw: number, actionId: string, crit: boolean): void {
-  const ctx: RuleContext = { actor: attacker, target, action: sim.actionDef(actionId) };
-  const taken = resolveParam('damageTaken', raw, ctx, collectModifiers(ctx));
+  const targetBlind = isBlindTo(sim, target, attacker.pos);
+  const ctx: RuleContext = { actor: attacker, target, action: sim.actionDef(actionId), targetBlind };
+  const mods = collectModifiers(ctx);
+  // A raised shield may stop the hit completely.
+  if (target.statuses.has('shielded')) {
+    const block = resolveParam('blockChance', BASE.blockBase, ctx, mods);
+    if (sim.rng.chance(clamp01(block.value))) {
+      sim.emit({ type: 'blocked', target: target.id, absorbed: Math.round(raw), full: true });
+      grantXp(sim, target, 'shield', situationDifficulty(target, attacker, false) + 1);
+      return;
+    }
+  }
+  const taken = resolveParam('damageTaken', raw, ctx, mods);
   const dmg = Math.max(0, Math.round(taken.value));
   const absorbed = Math.round(raw) - dmg;
   if (absorbed > 0) {
-    sim.emit({ type: 'blocked', target: target.id, absorbed });
+    sim.emit({ type: 'blocked', target: target.id, absorbed, full: false });
     if (target.statuses.has('shielded')) grantXp(sim, target, 'shield', situationDifficulty(target, attacker, false));
   }
   target.hp -= dmg;
@@ -72,7 +88,7 @@ function resolveMelee(sim: Sim, actor: Entity, a: ActionInstance): void {
     sim.emit({ type: 'missed', attacker: actor.id, target: target.id, action: def.id, reason: 'miss' });
     return;
   }
-  const targetBlind = !target.visible.has(sim.map.idx(actor.pos.x, actor.pos.y));
+  const targetBlind = isBlindTo(sim, target, actor.pos);
   const ctx: RuleContext = { actor, target, action: def, targetBlind };
   const mods = collectModifiers(ctx);
 

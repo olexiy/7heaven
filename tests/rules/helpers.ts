@@ -17,7 +17,10 @@ export function openRoom(w: number, h: number, playerStart: Vec, exit: Vec = { x
 }
 
 export function newSim(seed: number, w: number, h: number, playerStart: Vec): Sim {
-  return new Sim({ seed, fixedMap: openRoom(w, h, playerStart) });
+  const sim = new Sim({ seed, fixedMap: openRoom(w, h, playerStart) });
+  // Tests drive every action by hand.
+  sim.autoAttack = false;
+  return sim;
 }
 
 export interface Timed {
@@ -57,6 +60,8 @@ export function spawnDummy(sim: Sim, spec: EntitySpec, pos: Vec): Entity {
   const e = sim.spawn(spec, pos);
   e.awareness = 'combat';
   e.reactUntil = Number.MAX_SAFE_INTEGER;
+  // Face the player: attacks from behind can neither be dodged nor blocked, and turning costs time.
+  e.faceToward(sim.player.pos.x, sim.player.pos.y);
   return e;
 }
 

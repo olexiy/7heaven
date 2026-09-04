@@ -13,6 +13,7 @@ export type Param =
   | 'damage' // outgoing damage
   | 'damageTaken' // incoming damage after mitigation
   | 'interruptChance' // chance an interrupting hit breaks a phase
+  | 'blockChance' // chance a raised shield stops a hit completely
   | 'critChance';
 
 export interface RuleContext {
@@ -20,7 +21,7 @@ export interface RuleContext {
   target?: Entity;
   action: ActionDef;
   phase?: PhaseDef;
-  /** True if the target cannot see the actor (attack from blind spot / fog). */
+  /** True if the target cannot see the actor (attack from behind or out of its sight). */
   targetBlind?: boolean;
 }
 

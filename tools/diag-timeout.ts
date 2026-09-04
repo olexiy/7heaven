@@ -19,7 +19,7 @@ for (let seed = 1000; seed < 1300; seed++) {
   if (sim.status === 'running') {
     const p = sim.player;
     console.log(
-      `seed ${seed}: player ${JSON.stringify(p.pos)} hp ${p.hp} path ${p.path.length} legs ${p.action('legs')?.def.id} hands ${p.action('hands')?.def.id} exit ${JSON.stringify(sim.exit)}`,
+      `seed ${seed}: player ${JSON.stringify(p.pos)} hp ${p.hp} path ${p.path.length} legs ${p.action('legs')?.def.id} hands ${p.action('rightHand')?.def.id} exit ${JSON.stringify(sim.exit)}`,
     );
     for (const e of sim.enemiesAlive()) {
       console.log(

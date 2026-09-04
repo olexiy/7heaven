@@ -9,7 +9,7 @@ import { advanceAction, cancelAction, startAction } from '../action/engine';
 import type { GameEvent } from '../events';
 import { ACTIONS } from '../../data/actions';
 import { ENTITIES } from '../../data/entities';
-import { aiStep } from '../ai/ai';
+import { aiStep, autoAttack } from '../ai/ai';
 import { secToTicks } from '../time';
 
 export type Command =
@@ -17,7 +17,8 @@ export type Command =
   | { type: 'stop'; entity: EntityId }
   | { type: 'act'; entity: EntityId; action: string; target?: Target }
   | { type: 'cancel'; entity: EntityId; channel: ChannelId }
-  | { type: 'autopilot'; on: boolean };
+  | { type: 'autopilot'; on: boolean }
+  | { type: 'autoAttack'; on: boolean };
 
 export interface LoggedCommand {
   tick: number;
@@ -51,6 +52,8 @@ export class Sim {
   tick = 0;
   status: SimStatus = 'running';
   autopilot = false;
+  /** Player: fill free channels with basic attacks against adjacent foes. */
+  autoAttack = true;
   private nextId = 1;
   private eventBuf: GameEvent[] = [];
   private atExitNotified = false;
@@ -130,6 +133,9 @@ export class Sim {
       case 'autopilot':
         this.autopilot = cmd.on;
         return;
+      case 'autoAttack':
+        this.autoAttack = cmd.on;
+        return;
       case 'move': {
         const e = this.entities.get(cmd.entity);
         if (!e || !e.alive) return;
@@ -191,7 +197,10 @@ export class Sim {
     for (const e of this.alive()) {
       if (e.faction === 'enemy') aiStep(this, e);
     }
-    if (this.autopilot && this.player.alive) aiStep(this, this.player);
+    if (this.player.alive) {
+      if (this.autopilot) aiStep(this, this.player);
+      else if (this.autoAttack) this.playerAutoAttack();
+    }
 
     const p = this.player;
     if (!p.alive) {
@@ -205,6 +214,16 @@ export class Sim {
       this.atExitNotified = false;
     }
     return this.eventBuf;
+  }
+
+  /** Auto-attack for the player: only basic actions, only adjacent visible foes, never while casting. */
+  private playerAutoAttack(): void {
+    const p = this.player;
+    if (p.runningActions().some((a) => a.def.kind === 'spell')) return;
+    const foes = this.enemiesAlive().filter((e) => chebyshev(e.pos, p.pos) <= 1 && p.visible.has(this.map.idx(e.pos.x, e.pos.y)));
+    if (foes.length === 0) return;
+    foes.sort((a, b) => a.hp - b.hp);
+    autoAttack(this, p, foes[0]!);
   }
 
   /** Player confirmed leaving through the exit. */
@@ -298,6 +317,8 @@ function reasonText(reason: string): string {
       return 'цель не видна';
     case 'noTarget':
       return 'нет цели';
+    case 'cooldown':
+      return 'ещё не готово';
     default:
       return reason;
   }

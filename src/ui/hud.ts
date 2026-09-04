@@ -14,14 +14,16 @@ export interface HudCallbacks {
   onCancel: (c: ChannelId) => void;
   onAutopilot: () => void;
   onAutoFast: () => void;
+  onAutoAttack: () => void;
+  onPauseOnAbility: () => void;
   onLeave: () => void;
   onStay: () => void;
   onRestart: () => void;
 }
 
 const SKILL_NAMES: Record<SkillId, string> = { sword: 'Меч', unarmed: 'Ближний бой', shield: 'Щит', fire: 'Огонь' };
-const CHANNEL_NAMES: Record<ChannelId, string> = { legs: 'Ноги', hands: 'Руки' };
-const KEYS: Record<string, string> = { sword: 'Q', kick: 'W', shield: 'E', fireball: 'R' };
+const CHANNEL_NAMES: Record<ChannelId, string> = { legs: 'Ноги', rightHand: 'Правая', leftHand: 'Левая' };
+const KEYS: Record<string, string> = { sword: 'Q', kick: 'W', shield: 'E', shieldBash: 'F', fireball: 'R' };
 
 export class Hud {
   private root: HTMLElement;
@@ -31,6 +33,8 @@ export class Hud {
   private actionBtns = new Map<string, HTMLButtonElement>();
   private autoBtn!: HTMLButtonElement;
   private fastBtn!: HTMLButtonElement;
+  private attackBtn!: HTMLButtonElement;
+  private pauseAbilityBtn!: HTMLButtonElement;
   private riskEl!: HTMLElement;
   private hpBar!: HTMLElement;
   private manaBar!: HTMLElement;
@@ -85,6 +89,14 @@ export class Hud {
     this.fastBtn.title = 'Ускорять время, пока врагов не видно';
     this.fastBtn.onclick = () => this.cb.onAutoFast();
     top.append(this.fastBtn);
+    this.attackBtn = this.el('button', '', 'Автоатака');
+    this.attackBtn.title = 'Свободные руки и ноги сами бьют врага рядом базовыми действиями (T)';
+    this.attackBtn.onclick = () => this.cb.onAutoAttack();
+    top.append(this.attackBtn);
+    this.pauseAbilityBtn = this.el('button', '', 'Пауза: приём');
+    this.pauseAbilityBtn.title = 'Ставить паузу, когда враг в поле зрения начинает приём';
+    this.pauseAbilityBtn.onclick = () => this.cb.onPauseOnAbility();
+    top.append(this.pauseAbilityBtn);
     this.root.append(top);
 
     this.statusEl = this.el('div', 'panel');
@@ -95,7 +107,7 @@ export class Hud {
     this.hintEl = this.el('div', 'panel');
     this.hintEl.id = 'hint';
     this.hintEl.innerHTML =
-      '<b>Пробел</b> — пауза · <b>1/2/3</b> — скорость · <b>клик</b> — идти · <b>Q W E R</b> — действия · клик по кольцу — отмена · <b>Esc</b> — снять выбор';
+      '<b>Пробел</b> — пауза · <b>1/2/3</b> — скорость · <b>клик</b> — идти · <b>Q W</b> — действия · <b>E F R</b> — приёмы · клик по кольцу — отмена · <b>Esc</b> — снять выбор';
     this.root.append(this.hintEl);
 
     // Left: bars + skills.
@@ -159,15 +171,26 @@ export class Hud {
   setActions(sim: Sim): void {
     this.actionsRoot.innerHTML = '';
     this.actionBtns.clear();
-    for (const id of sim.player.spec.actions) {
-      const def = sim.actionDef(id);
-      const b = this.el('button');
-      const dur = def.phases.reduce((s, p) => s + p.baseDuration, 0);
-      b.innerHTML = `${def.name}<kbd>${KEYS[id] ?? ''}</kbd><small>${dur.toFixed(1)} с${def.cost?.mana ? ` · ${def.cost.mana} маны` : ''}</small>`;
-      b.style.borderLeft = `3px solid ${def.color}`;
-      b.onclick = () => this.cb.onAction(id);
-      this.actionBtns.set(id, b);
-      this.actionsRoot.append(b);
+    const groups: [string, string][] = [
+      ['action', 'Действия'],
+      ['ability', 'Приёмы'],
+    ];
+    for (const [cat, label] of groups) {
+      const wrap = this.el('div', 'group');
+      wrap.append(this.el('div', 'group-label', label));
+      for (const id of sim.player.spec.actions) {
+        const def = sim.actionDef(id);
+        if (def.category !== cat) continue;
+        const b = this.el('button');
+        const dur = def.phases.reduce((s, p) => s + p.baseDuration, 0);
+        const cd = def.cooldown ? ` · откат ${def.cooldown.toFixed(0)} с` : '';
+        b.innerHTML = `<span class="label">${def.name}</span><kbd>${KEYS[id] ?? ''}</kbd><small>${dur.toFixed(1)} с${cd}${def.cost?.mana ? ` · ${def.cost.mana} маны` : ''}</small><span class="cd"></span>`;
+        b.style.borderLeft = `3px solid ${def.color}`;
+        b.onclick = () => this.cb.onAction(id);
+        this.actionBtns.set(id, b);
+        wrap.append(b);
+      }
+      this.actionsRoot.append(wrap);
     }
   }
 
@@ -176,12 +199,14 @@ export class Hud {
     return RISK_TEXT[r.level] + (causes.length ? ` — ${causes.join(', ')}` : '');
   }
 
-  update(sim: Sim, paused: boolean, speed: Speed, targeting: string | null, hover: Vec | null, autoFast: boolean, fastNow: boolean): void {
+  update(sim: Sim, paused: boolean, speed: Speed, targeting: string | null, hover: Vec | null, autoFast: boolean, fastNow: boolean, pauseOnAbility: boolean): void {
     const p = sim.player;
     this.timeEl.textContent = `${ticksToSec(sim.tick).toFixed(1)} с`;
     for (const [s, b] of this.speedBtns) b.classList.toggle('active', s === 0 ? paused : !paused && speed === s);
     this.autoBtn.classList.toggle('active', sim.autopilot);
     this.fastBtn.classList.toggle('active', autoFast);
+    this.attackBtn.classList.toggle('active', sim.autoAttack);
+    this.pauseAbilityBtn.classList.toggle('active', pauseOnAbility);
     this.statusEl.textContent = paused ? 'ПАУЗА' : fastNow ? 'ПЕРЕМОТКА ×5' : sim.autopilot ? 'АВТОПИЛОТ' : '';
 
     // Verbal risk for the action being aimed.
@@ -221,8 +246,11 @@ export class Hud {
 
     for (const [id, b] of this.actionBtns) {
       const def = sim.actionDef(id);
+      const cdLeft = p.cooldownLeft(id, sim.tick);
       b.classList.toggle('active', targeting === id);
-      b.disabled = !p.channelsFree(def.channels) || (def.cost?.mana !== undefined && p.mana < def.cost.mana);
+      b.disabled = cdLeft > 0 || !p.channelsFree(def.channels) || (def.cost?.mana !== undefined && p.mana < def.cost.mana);
+      const cdEl = b.querySelector('.cd') as HTMLElement;
+      cdEl.textContent = cdLeft > 0 ? `${ticksToSec(cdLeft).toFixed(1)}` : '';
     }
 
     this.channelsEl.innerHTML = '';
@@ -237,6 +265,8 @@ export class Hud {
         what = `${a.def.name} · ${PHASE_NAMES[phase.id] ?? phase.id} · ${left} с`;
         const r = assessRunning(sim, p, a);
         if (r && r.level !== 'sure') what += ` · ${this.riskText(r)}`;
+        const cdIds = p.spec.actions.filter((id) => sim.actionDef(id).channels.includes(c) && p.cooldownLeft(id, sim.tick) > 0);
+        void cdIds;
       } else if (c === 'legs' && p.path.length > 0) {
         what = `путь: ${p.path.length} кл.`;
       }

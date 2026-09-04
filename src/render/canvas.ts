@@ -44,8 +44,8 @@ export interface ViewState {
   nowMs: number;
 }
 
-const RING_R: Record<ChannelId, number> = { hands: 13, legs: 18 };
-const RING_W = 3.5;
+const RING_R: Record<ChannelId, number> = { rightHand: 10, leftHand: 14.5, legs: 19 };
+const RING_W = 3;
 
 /** Canvas 2D isometric renderer with placeholder shapes. */
 export class CanvasRenderer {
@@ -113,7 +113,7 @@ export class CanvasRenderer {
     const rx = es.sx - this.camX + w / 2;
     const ry = es.sy - ENTITY_H - 22 - this.camY + h / 2;
     const dist = Math.hypot(cx - rx, cy - ry);
-    for (const c of ['hands', 'legs'] as const) {
+    for (const c of CHANNELS) {
       if (!p.action(c)) continue;
       if (Math.abs(dist - RING_R[c]) <= RING_W / 2 + 1) return c;
     }
@@ -395,6 +395,21 @@ export class CanvasRenderer {
     ctx.lineWidth = 1;
     ctx.stroke();
 
+    // Facing: a small wedge on the ground in front of the feet.
+    const f = e.facing;
+    const fx = ((f.dx - f.dy) * TILE_W) / 2;
+    const fy = ((f.dx + f.dy) * TILE_H) / 2;
+    const len = Math.hypot(fx, fy) || 1;
+    const nx = (fx / len) * 16;
+    const ny = (fy / len) * 16;
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath();
+    ctx.moveTo(sx + nx, sy + ny);
+    ctx.lineTo(sx + nx * 0.55 - ny * 0.3, sy + ny * 0.55 + nx * 0.3);
+    ctx.lineTo(sx + nx * 0.55 + ny * 0.3, sy + ny * 0.55 - nx * 0.3);
+    ctx.closePath();
+    ctx.fill();
+
     // Shield glow.
     if (e.statuses.has('shielded')) {
       ctx.strokeStyle = 'rgba(76, 201, 240, 0.9)';
@@ -405,7 +420,7 @@ export class CanvasRenderer {
     }
 
     // Spell visuals.
-    const hands = e.action('hands');
+    const hands = e.action('rightHand');
     if (hands && hands.def.kind === 'spell') this.drawSpell(e, hands, sx, sy, alpha, view);
 
     // HP bar.
@@ -416,10 +431,12 @@ export class CanvasRenderer {
     ctx.fillRect(sx - hpW / 2, sy - ENTITY_H - 8, hpW * Math.max(0, e.hp / e.maxHp), 4);
 
     // Rings.
-    const cy = sy - ENTITY_H - 22;
+    const cy = sy - ENTITY_H - 24;
+    const drawn = new Set<ActionInstance>();
     for (const c of CHANNELS) {
       const a = e.action(c);
-      if (!a) continue;
+      if (!a || drawn.has(a)) continue;
+      drawn.add(a);
       this.drawRing(a, sx, cy, RING_R[c], alpha);
     }
     // Name for enemies.

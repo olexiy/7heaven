@@ -10,7 +10,7 @@ export type GameEvent =
   | { type: 'actionDone'; id: EntityId; action: string }
   | { type: 'hit'; attacker: EntityId; target: EntityId; damage: number; crit: boolean; action: string }
   | { type: 'missed'; attacker: EntityId; target: EntityId; action: string; reason: 'miss' | 'dodge' }
-  | { type: 'blocked'; target: EntityId; absorbed: number }
+  | { type: 'blocked'; target: EntityId; absorbed: number; full: boolean }
   | { type: 'interrupted'; attacker: EntityId; target: EntityId; action: string }
   | { type: 'projectile'; from: Vec; to: Vec; action: string; ticks: number }
   | { type: 'died'; id: EntityId }

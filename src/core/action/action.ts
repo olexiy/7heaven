@@ -3,6 +3,12 @@ import type { ChannelId, EntityId, SkillId } from '../entity/entity';
 
 export type ActionKind = 'step' | 'melee' | 'shield' | 'spell';
 
+/**
+ * Basic actions may be used by auto-attack; abilities are always started by hand
+ * (player) or by the AI, and usually carry a longer cooldown.
+ */
+export type ActionCategory = 'action' | 'ability';
+
 export type CancelPolicy = 'keep' | 'loseAccumulated' | 'loseAll';
 
 export interface PhaseDef {
@@ -20,7 +26,10 @@ export interface ActionDef {
   id: string;
   name: string;
   kind: ActionKind;
+  category: ActionCategory;
   channels: readonly ChannelId[];
+  /** Recovery time in seconds after the action ends before it can be used again. */
+  cooldown?: number;
   phases: readonly PhaseDef[];
   /** Governing skill (for duration modifiers and XP). */
   skill?: SkillId;

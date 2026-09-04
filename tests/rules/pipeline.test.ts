@@ -34,7 +34,7 @@ describe('Rule 1: moving multiplies spell formation failure', () => {
     run(sim, castDelay);
     expect(sim.player.pos).toEqual(START); // the cast is issued from the starting tile in all cases
     sim.command({ type: 'act', entity: sim.playerId, action: 'fireball', target: { kind: 'tile', pos: SPELL_TARGET } });
-    expect(sim.player.action('hands')?.def.id).toBe('fireball');
+    expect(sim.player.action('rightHand')?.def.id).toBe('fireball');
     const formEndTick = castDelay + FORM_END;
     const events = run(sim, FORM_END + 25);
 
@@ -97,7 +97,7 @@ describe('Rule 2: skill level shortens action duration', () => {
     const ghoul = spawnDummy(sim, GHOUL, { x: 4, y: 3 });
     sim.player.skills.get('sword')!.level = level;
     sim.command({ type: 'act', entity: sim.playerId, action: 'sword', target: { kind: 'entity', id: ghoul.id } });
-    const inst = sim.player.action('hands');
+    const inst = sim.player.action('rightHand');
     expect(inst?.def.id).toBe('sword');
     const events = run(sim, 60);
     const done = events.find((t) => t.ev.type === 'actionDone' && t.ev.id === sim.playerId && t.ev.action === 'sword');
@@ -348,12 +348,12 @@ describe('Rule 5: kick interrupts only the gather phase of a spell', () => {
     let phaseAtImpact: string | undefined;
     const events: Timed[] = [];
     sim.command({ type: 'act', entity: sim.playerId, action: 'fireball', target: { kind: 'tile', pos: SPELL_TARGET } });
-    expect(sim.player.action('hands')?.def.id).toBe('fireball');
+    expect(sim.player.action('rightHand')?.def.id).toBe('fireball');
     // Run past both the kick impact and the end of gather, so we can tell whether form was reached.
     while (sim.tick < Math.max(impact, FIREBALL_GATHER) + 5) {
       if (sim.tick === kickAt) sim.command({ type: 'act', entity: ghoul.id, action: 'kick', target: { kind: 'entity', id: sim.playerId } });
       if (sim.tick === impact - 1) {
-        const a = sim.player.action('hands');
+        const a = sim.player.action('rightHand');
         phaseAtImpact = a ? a.def.phases[a.phaseIndex]!.id : undefined;
       }
       for (const ev of sim.step()) events.push({ tick: sim.tick, ev });

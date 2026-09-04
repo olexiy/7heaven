@@ -8,7 +8,7 @@ import { hasLineOfSight } from '../world/fov';
 import { secToTicks } from '../time';
 import { clamp01, resolveParam, type RuleContext } from '../rules/modifiers';
 import { collectModifiers } from '../rules/collect';
-import { DIAGONAL_STEP_FACTOR } from '../../data/actions';
+import { DIAGONAL_STEP_FACTOR, TURN_SECONDS } from '../../data/actions';
 import { resolveAction } from './resolve';
 
 export type StartResult = { ok: true; instance: ActionInstance } | { ok: false; reason: string };
@@ -28,7 +28,7 @@ export function targetPos(sim: Sim, a: ActionInstance): Vec | undefined {
   return targetEntity(sim, a)?.pos;
 }
 
-function phaseTicks(sim: Sim, actor: Entity, def: ActionDef, phaseIndex: number, stepTo: Vec | null): number {
+function phaseTicks(actor: Entity, def: ActionDef, phaseIndex: number, stepTo: Vec | null, extraSeconds = 0): number {
   const phase = def.phases[phaseIndex]!;
   let base = phase.baseDuration;
   if (def.kind === 'step' && stepTo) {
@@ -37,30 +37,37 @@ function phaseTicks(sim: Sim, actor: Entity, def: ActionDef, phaseIndex: number,
   }
   const ctx: RuleContext = { actor, action: def, phase };
   const r = resolveParam('duration', base, ctx, collectModifiers(ctx));
-  void sim;
-  return secToTicks(r.value);
+  return secToTicks(r.value + extraSeconds);
 }
 
 /** Validate and start an action. Only hard rule: required channels must be free. */
 export function startAction(sim: Sim, actor: Entity, def: ActionDef, target: Target | null): StartResult {
   if (!actor.alive) return { ok: false, reason: 'dead' };
   if (!actor.channelsFree(def.channels)) return { ok: false, reason: 'channelBusy' };
+  if (actor.cooldownLeft(def.id, sim.tick) > 0) return { ok: false, reason: 'cooldown' };
   if (def.cost?.mana && actor.mana < def.cost.mana) return { ok: false, reason: 'noMana' };
 
   let stepTo: Vec | null = null;
+  let turnSeconds = 0;
+  let facePoint: Vec | null = null;
   if (def.kind === 'step') {
     if (!target || target.kind !== 'tile') return { ok: false, reason: 'noTarget' };
     if (chebyshev(actor.pos, target.pos) !== 1) return { ok: false, reason: 'notAdjacent' };
     if (!sim.map.isFloor(target.pos.x, target.pos.y)) return { ok: false, reason: 'wall' };
     if (sim.entityAt(target.pos)) return { ok: false, reason: 'occupied' };
     stepTo = target.pos;
+    facePoint = target.pos;
   } else if (def.range !== undefined) {
     if (!target) return { ok: false, reason: 'noTarget' };
     const tp = target.kind === 'tile' ? target.pos : sim.entities.get(target.id)?.pos;
     if (!tp) return { ok: false, reason: 'noTarget' };
     if (chebyshev(actor.pos, tp) > def.range) return { ok: false, reason: 'outOfRange' };
     if (def.needsLos && !hasLineOfSight(sim.map, actor.pos, tp)) return { ok: false, reason: 'noLos' };
+    facePoint = tp;
+    // Turning to something behind you costs time: a twist of the whole body.
+    if (actor.isBehind(tp.x, tp.y)) turnSeconds = TURN_SECONDS;
   }
+  if (facePoint) actor.faceToward(facePoint.x, facePoint.y);
 
   const instance: ActionInstance = {
     def,
@@ -73,13 +80,10 @@ export function startAction(sim: Sim, actor: Entity, def: ActionDef, target: Tar
     startedTick: sim.tick,
     stepTo,
   };
-  instance.phaseTotal = phaseTicks(sim, actor, def, 0, stepTo);
+  instance.phaseTotal = phaseTicks(actor, def, 0, stepTo, turnSeconds);
   instance.remaining = instance.phaseTotal;
   for (const c of def.channels) actor.channels.set(c, instance);
   sim.emit({ type: 'actionStarted', id: actor.id, action: def.id, channels: def.channels });
-  if (def.kind === 'shield') {
-    // Shield raises: 'shielded' status appears when hold phase begins.
-  }
   return { ok: true, instance };
 }
 
@@ -88,6 +92,11 @@ function releaseChannels(actor: Entity, a: ActionInstance): void {
     if (actor.channels.get(c) === a) actor.channels.set(c, null);
   }
   if (a.def.kind === 'shield') actor.statuses.delete('shielded');
+}
+
+/** Recovery starts when the action ends (done, failed or interrupted), not when it is cancelled early. */
+function startCooldown(sim: Sim, actor: Entity, a: ActionInstance): void {
+  if (a.def.cooldown) actor.cooldowns.set(a.def.id, sim.tick + secToTicks(a.def.cooldown));
 }
 
 /** Apply the cancel policy of the current phase (mana loss etc.). */
@@ -114,6 +123,7 @@ export function tryInterrupt(sim: Sim, attacker: Entity, target: Entity, chance:
     if (sim.rng.chance(clamp01(chance))) {
       applyCancelPolicy(a);
       releaseChannels(target, a);
+      startCooldown(sim, target, a);
       sim.emit({ type: 'interrupted', attacker: attacker.id, target: target.id, action: a.def.id });
       return true;
     }
@@ -143,6 +153,7 @@ export function advanceAction(sim: Sim, actor: Entity, a: ActionInstance): void 
     const fail = resolveParam('failChance', phase.failBase, ctx, collectModifiers(ctx));
     if (sim.rng.chance(clamp01(fail.value))) {
       releaseChannels(actor, a);
+      startCooldown(sim, actor, a);
       sim.emit({ type: 'actionFailed', id: actor.id, action: def.id, phase: phase.id, reason: fail.trace.map((t) => t.source).join(',') });
       resolveAction(sim, actor, a, 'failed');
       return;
@@ -151,7 +162,7 @@ export function advanceAction(sim: Sim, actor: Entity, a: ActionInstance): void 
 
   if (a.phaseIndex < def.phases.length - 1) {
     a.phaseIndex++;
-    a.phaseTotal = phaseTicks(sim, actor, def, a.phaseIndex, a.stepTo);
+    a.phaseTotal = phaseTicks(actor, def, a.phaseIndex, a.stepTo);
     a.remaining = a.phaseTotal;
     const next = currentPhase(a);
     if (def.kind === 'shield' && next.id === 'hold') actor.statuses.add('shielded');
@@ -160,6 +171,7 @@ export function advanceAction(sim: Sim, actor: Entity, a: ActionInstance): void 
   }
 
   releaseChannels(actor, a);
+  startCooldown(sim, actor, a);
   resolveAction(sim, actor, a, 'done');
   sim.emit({ type: 'actionDone', id: actor.id, action: def.id });
 }

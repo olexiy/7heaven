@@ -11,7 +11,7 @@ export const ENTITIES: Record<string, EntitySpec> = {
     skills: { sword: 0, unarmed: 0, shield: 0, fire: 0 },
     sight: 7,
     reaction: 0.3,
-    actions: ['sword', 'kick', 'shield', 'fireball'],
+    actions: ['sword', 'kick', 'shield', 'shieldBash', 'fireball'],
   },
   ghoul: {
     kind: 'ghoul',
@@ -36,5 +36,17 @@ export const ENTITIES: Record<string, EntitySpec> = {
     sight: 8,
     reaction: 0.4,
     actions: ['claw', 'kick'],
+  },
+  shaman: {
+    kind: 'shaman',
+    name: 'Шаман',
+    faction: 'enemy',
+    maxHp: 35,
+    maxMana: 100,
+    attributes: { str: 5, agi: 8, end: 6, int: 9, wis: 9, per: 9 },
+    skills: { unarmed: 0, fire: 2 },
+    sight: 7,
+    reaction: 0.5,
+    actions: ['hex', 'claw'],
   },
 };

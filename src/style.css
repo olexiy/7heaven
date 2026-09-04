@@ -63,8 +63,14 @@ body {
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
+  white-space: nowrap;
+}
+
+#top button {
+  padding: 4px 8px;
+  font-size: 12px;
 }
 
 #top .time {
@@ -121,7 +127,7 @@ button:disabled {
 #left {
   left: 10px;
   bottom: 10px;
-  width: 230px;
+  width: 190px;
 }
 
 .bar {
@@ -177,8 +183,12 @@ button:disabled {
 }
 
 #actions button {
-  min-width: 96px;
+  min-width: 78px;
+  max-width: 96px;
   text-align: left;
+  font-size: 12px;
+  padding: 4px 7px;
+  line-height: 1.2;
 }
 
 #actions button small {
@@ -196,7 +206,7 @@ button:disabled {
 #right {
   right: 10px;
   top: 10px;
-  width: 260px;
+  width: 220px;
   max-height: 45vh;
   overflow: hidden;
   display: flex;
@@ -234,7 +244,8 @@ button:disabled {
 #channels {
   right: 10px;
   bottom: 10px;
-  width: 260px;
+  width: 235px;
+  font-size: 12px;
 }
 
 #channels .ch {
@@ -262,8 +273,8 @@ button:disabled {
   top: 10px;
   left: 10px;
   color: var(--muted);
-  font-size: 12px;
-  max-width: 260px;
+  font-size: 11px;
+  max-width: 200px;
 }
 
 #overlay {
@@ -310,4 +321,43 @@ button:disabled {
   color: var(--warn);
   padding: 4px 12px;
   white-space: nowrap;
+}
+
+#actions {
+  align-items: flex-end;
+  gap: 12px;
+}
+
+#actions .group {
+  display: flex;
+  gap: 6px;
+  position: relative;
+  padding-top: 12px;
+}
+
+#actions .group-label {
+  position: absolute;
+  top: -4px;
+  left: 2px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+#actions button {
+  position: relative;
+}
+
+#actions button .cd {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  font-size: 11px;
+  color: var(--warn);
+  font-variant-numeric: tabular-nums;
+}
+
+#actions button:disabled .cd {
+  opacity: 1;
 }

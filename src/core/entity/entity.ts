@@ -4,9 +4,15 @@ import type { ActionInstance } from '../action/action';
 export type EntityId = number;
 export type Faction = 'player' | 'enemy';
 
-/** Body channels. MVP: legs and hands (hands+mind merged). */
-export type ChannelId = 'legs' | 'hands';
-export const CHANNELS: readonly ChannelId[] = ['legs', 'hands'];
+/** Body channels. Mind is merged into the hands for now (spells take both hands). */
+export type ChannelId = 'legs' | 'rightHand' | 'leftHand';
+export const CHANNELS: readonly ChannelId[] = ['legs', 'rightHand', 'leftHand'];
+
+/** Facing as a unit-ish direction on the 8-neighbourhood grid. */
+export interface Dir {
+  dx: number;
+  dy: number;
+}
 
 export type SkillId = 'sword' | 'unarmed' | 'shield' | 'fire';
 export const SKILLS: readonly SkillId[] = ['sword', 'unarmed', 'shield', 'fire'];
@@ -69,6 +75,10 @@ export class Entity {
   reactUntil = 0;
   /** Timestamp of last damage received (for status/animation). */
   lastHitTick = -1;
+  /** Where the body faces. Attacks from behind cannot be dodged or blocked. */
+  facing: Dir = { dx: 0, dy: 1 };
+  /** Per-action recovery: action id → tick when it can be used again. */
+  readonly cooldowns = new Map<string, number>();
 
   constructor(
     readonly id: EntityId,
@@ -123,6 +133,27 @@ export class Entity {
     const a = this.channels.get('legs');
     if (a) return a.def.kind === 'step';
     return this.path.length > 0;
+  }
+
+  /** Ticks until the action is ready again (0 = ready). */
+  cooldownLeft(actionId: string, tick: number): number {
+    const ready = this.cooldowns.get(actionId) ?? 0;
+    return Math.max(0, ready - tick);
+  }
+
+  /** Turn toward a point (no cost here; the cost is applied by the action engine). */
+  faceToward(x: number, y: number): void {
+    const dx = Math.sign(x - this.pos.x);
+    const dy = Math.sign(y - this.pos.y);
+    if (dx !== 0 || dy !== 0) this.facing = { dx, dy };
+  }
+
+  /** True if `x,y` lies in the rear half-plane relative to the facing direction. */
+  isBehind(x: number, y: number): boolean {
+    const vx = x - this.pos.x;
+    const vy = y - this.pos.y;
+    if (vx === 0 && vy === 0) return false;
+    return vx * this.facing.dx + vy * this.facing.dy < 0;
   }
 
   isBusy(): boolean {

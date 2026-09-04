@@ -32,6 +32,9 @@ export const BASE = {
   spellMissPerTile: 0.03,
   /** Backlash damage on a failed formation, fraction of maxHp. */
   backlashFrac: 0.05,
+  /** Raised shield: chance to stop a hit completely at Shield level 0; each level adds blockPerLevel. */
+  blockBase: 0.15,
+  blockPerLevel: 0.04,
 };
 
 /** Modifiers granted by a skill at a given level. */
@@ -72,6 +75,13 @@ export function skillModifiers(skill: SkillId, level: number): Modifier[] {
     });
   }
   return mods;
+}
+
+/** Modifiers a defender contributes to blocking (from its own Shield skill). */
+export function blockModifiers(defender: Entity): Modifier[] {
+  const level = defender.skillLevel('shield');
+  if (level <= 0) return [];
+  return [{ stage: 'resolve', param: 'blockChance', op: 'add', value: level * BASE.blockPerLevel, source: 'skill:shield' }];
 }
 
 /** Modifiers from the actor's own body state. */
@@ -130,6 +140,16 @@ export function targetModifiers(target: Entity): Modifier[] {
     source: 'target:legsBusy',
     when: (ctx) => !!ctx.target && !ctx.target.isChannelFree('legs'),
   });
+  // Can't block what you don't see either.
+  mods.push({
+    stage: 'resolve',
+    param: 'blockChance',
+    op: 'mul',
+    value: 0,
+    source: 'target:blind',
+    when: (ctx) => ctx.targetBlind === true,
+  });
+  mods.push(...blockModifiers(target));
   // Shield: only while the hold phase is active; strength comes from the shield action itself.
   const shieldAction = target.runningActions().find((a) => a.def.kind === 'shield');
   if (shieldAction) {

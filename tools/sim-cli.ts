@@ -1,6 +1,6 @@
 /**
  * Headless balance harness: runs N rifts with the player on autopilot and reports outcomes.
- *   npm run sim -- [runs=300] [enemies=ghoul,ghoulKeen,ghoul] [maxSeconds=300]
+ *   npm run sim -- [runs=300] [enemies=ghoul,ghoulKeen,ghoul,shaman] [maxSeconds=300]
  */
 import { Sim } from '../src/core/sim/sim';
 import { TICKS_PER_SEC, ticksToSec } from '../src/core/time';
@@ -8,7 +8,7 @@ import type { GameEvent } from '../src/core/events';
 
 const args = process.argv.slice(2);
 const runs = Number(args[0] ?? 300);
-const enemies = (args[1] ?? 'ghoul,ghoulKeen,ghoul').split(',').filter(Boolean);
+const enemies = (args[1] ?? 'ghoul,ghoulKeen,ghoul,shaman').split(',').filter(Boolean);
 const maxTicks = Number(args[2] ?? 300) * TICKS_PER_SEC;
 
 interface RunStats {
