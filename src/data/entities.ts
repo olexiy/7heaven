@@ -1,0 +1,40 @@
+import type { EntitySpec } from '../core/entity/entity';
+
+export const ENTITIES: Record<string, EntitySpec> = {
+  player: {
+    kind: 'player',
+    name: 'Страж',
+    faction: 'player',
+    maxHp: 100,
+    maxMana: 100,
+    attributes: { str: 10, agi: 10, end: 10, int: 10, wis: 10, per: 10 },
+    skills: { sword: 0, unarmed: 0, shield: 0, fire: 0 },
+    sight: 7,
+    reaction: 0.3,
+    actions: ['sword', 'kick', 'shield', 'fireball'],
+  },
+  ghoul: {
+    kind: 'ghoul',
+    name: 'Гуль',
+    faction: 'enemy',
+    maxHp: 45,
+    maxMana: 0,
+    attributes: { str: 8, agi: 7, end: 8, int: 3, wis: 3, per: 5 },
+    skills: { unarmed: 1 },
+    sight: 5,
+    reaction: 0.8,
+    actions: ['claw'],
+  },
+  ghoulKeen: {
+    kind: 'ghoulKeen',
+    name: 'Чуткий гуль',
+    faction: 'enemy',
+    maxHp: 40,
+    maxMana: 0,
+    attributes: { str: 7, agi: 9, end: 7, int: 3, wis: 3, per: 12 },
+    skills: { unarmed: 2 },
+    sight: 8,
+    reaction: 0.4,
+    actions: ['claw'],
+  },
+};
