@@ -130,15 +130,18 @@ export function targetModifiers(target: Entity): Modifier[] {
     source: 'target:legsBusy',
     when: (ctx) => !!ctx.target && !ctx.target.isChannelFree('legs'),
   });
-  // Shield: only while the hold phase is active.
-  mods.push({
-    stage: 'resolve',
-    param: 'damageTaken',
-    op: 'mul',
-    value: 1 - 0.7,
-    source: 'target:shield',
-    when: (ctx) => !!ctx.target && ctx.target.statuses.has('shielded'),
-  });
+  // Shield: only while the hold phase is active; strength comes from the shield action itself.
+  const shieldAction = target.runningActions().find((a) => a.def.kind === 'shield');
+  if (shieldAction) {
+    mods.push({
+      stage: 'resolve',
+      param: 'damageTaken',
+      op: 'mul',
+      value: 1 - (shieldAction.def.damageReduction ?? 0),
+      source: 'target:shield',
+      when: (ctx) => !!ctx.target && ctx.target.statuses.has('shielded'),
+    });
+  }
   return mods;
 }
 

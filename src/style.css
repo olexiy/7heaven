@@ -302,3 +302,12 @@ button:disabled {
   gap: 8px;
   justify-content: center;
 }
+
+#risk {
+  bottom: 68px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--warn);
+  padding: 4px 12px;
+  white-space: nowrap;
+}

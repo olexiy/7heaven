@@ -23,10 +23,19 @@ export class TimeController {
     this.paused = false;
   }
 
+  /** Auto fast-forward: when nothing threatens the player, run at this speed. */
+  autoFast = true;
+  /** Set by the app each frame: true if the world is calm and a long action is running. */
+  calm = false;
+
+  effectiveSpeed(): number {
+    return this.autoFast && this.calm ? Math.max(this.speed, 5) : this.speed;
+  }
+
   /** Returns how many ticks to run for this frame. */
   update(dtMs: number): number {
     if (this.paused) return 0;
-    this.acc += Math.min(dtMs, 250) * this.speed;
+    this.acc += Math.min(dtMs, 250) * this.effectiveSpeed();
     const n = Math.floor(this.acc / TICK_MS);
     this.acc -= n * TICK_MS;
     this.alpha = this.acc / TICK_MS;

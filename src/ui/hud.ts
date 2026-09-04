@@ -4,12 +4,16 @@ import { ticksToSec } from '../core/time';
 import { PHASE_NAMES } from '../data/actions';
 import { xpToNext } from '../data/rules';
 import type { Speed } from '../app/loop';
+import { assessAction, assessRunning, CAUSE_TEXT, RISK_TEXT, type Risk } from '../core/rules/risk';
+import type { Vec } from '../core/world/map';
+import { chebyshev } from '../core/world/map';
 
 export interface HudCallbacks {
   onSpeed: (s: Speed) => void;
   onAction: (id: string) => void;
   onCancel: (c: ChannelId) => void;
   onAutopilot: () => void;
+  onAutoFast: () => void;
   onLeave: () => void;
   onStay: () => void;
   onRestart: () => void;
@@ -26,6 +30,8 @@ export class Hud {
   private speedBtns = new Map<Speed, HTMLButtonElement>();
   private actionBtns = new Map<string, HTMLButtonElement>();
   private autoBtn!: HTMLButtonElement;
+  private fastBtn!: HTMLButtonElement;
+  private riskEl!: HTMLElement;
   private hpBar!: HTMLElement;
   private manaBar!: HTMLElement;
   private hpText!: HTMLElement;
@@ -75,6 +81,10 @@ export class Hud {
     this.autoBtn.title = 'Персонаж действует сам (A)';
     this.autoBtn.onclick = () => this.cb.onAutopilot();
     top.append(this.autoBtn);
+    this.fastBtn = this.el('button', '', 'Перемотка');
+    this.fastBtn.title = 'Ускорять время, пока врагов не видно';
+    this.fastBtn.onclick = () => this.cb.onAutoFast();
+    top.append(this.fastBtn);
     this.root.append(top);
 
     this.statusEl = this.el('div', 'panel');
@@ -104,6 +114,11 @@ export class Hud {
     this.skillsEl = this.el('div', 'skills');
     left.append(hpRow, hpBar, manaRow, manaBar, this.skillsEl);
     this.root.append(left);
+
+    // Risk line above the actions.
+    this.riskEl = this.el('div', 'panel');
+    this.riskEl.id = 'risk';
+    this.root.append(this.riskEl);
 
     // Actions.
     const actions = this.el('div', 'panel');
@@ -156,12 +171,39 @@ export class Hud {
     }
   }
 
-  update(sim: Sim, paused: boolean, speed: Speed, targeting: string | null): void {
+  private riskText(r: Risk): string {
+    const causes = r.causes.map((c) => CAUSE_TEXT[c] ?? c).filter(Boolean);
+    return RISK_TEXT[r.level] + (causes.length ? ` — ${causes.join(', ')}` : '');
+  }
+
+  update(sim: Sim, paused: boolean, speed: Speed, targeting: string | null, hover: Vec | null, autoFast: boolean, fastNow: boolean): void {
     const p = sim.player;
     this.timeEl.textContent = `${ticksToSec(sim.tick).toFixed(1)} с`;
     for (const [s, b] of this.speedBtns) b.classList.toggle('active', s === 0 ? paused : !paused && speed === s);
     this.autoBtn.classList.toggle('active', sim.autopilot);
-    this.statusEl.textContent = paused ? 'ПАУЗА' : sim.autopilot ? 'АВТОПИЛОТ' : '';
+    this.fastBtn.classList.toggle('active', autoFast);
+    this.statusEl.textContent = paused ? 'ПАУЗА' : fastNow ? 'ПЕРЕМОТКА ×5' : sim.autopilot ? 'АВТОПИЛОТ' : '';
+
+    // Verbal risk for the action being aimed.
+    let risk = '';
+    if (targeting) {
+      const def = sim.actionDef(targeting);
+      if (hover && sim.map.inBounds(hover.x, hover.y)) {
+        const ent = sim.entityAt(hover);
+        const tgt = ent && ent.id !== p.id ? ent : undefined;
+        const dist = chebyshev(p.pos, hover);
+        const inRange = def.range === undefined || dist <= def.range;
+        const seen = p.visible.has(sim.map.idx(hover.x, hover.y));
+        if (!inRange) risk = `${def.name}: слишком далеко`;
+        else if (def.needsLos && !seen) risk = `${def.name}: цель не видна`;
+        else if (def.kind === 'melee' && !tgt) risk = `${def.name}: выберите врага рядом`;
+        else risk = `${def.name}: ${this.riskText(assessAction(sim, p, def, tgt, dist))}`;
+      } else {
+        risk = `${def.name}: выберите цель`;
+      }
+    }
+    this.riskEl.textContent = risk;
+    this.riskEl.style.display = risk ? '' : 'none';
 
     this.hpBar.style.width = `${(100 * p.hp) / p.maxHp}%`;
     this.hpText.textContent = `${Math.ceil(p.hp)} / ${p.maxHp}`;
@@ -193,6 +235,8 @@ export class Hud {
         const phase = a.def.phases[a.phaseIndex]!;
         const left = ticksToSec(a.remaining).toFixed(1);
         what = `${a.def.name} · ${PHASE_NAMES[phase.id] ?? phase.id} · ${left} с`;
+        const r = assessRunning(sim, p, a);
+        if (r && r.level !== 'sure') what += ` · ${this.riskText(r)}`;
       } else if (c === 'legs' && p.path.length > 0) {
         what = `путь: ${p.path.length} кл.`;
       }

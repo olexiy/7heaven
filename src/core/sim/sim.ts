@@ -168,7 +168,9 @@ export class Sim {
       const o = this.entityAt({ x, y });
       return !!o && o.id !== e.id;
     };
-    const path = findPath(this.map, e.pos, to, blocked);
+    let path = findPath(this.map, e.pos, to, blocked);
+    // Someone stands in the only corridor: go anyway and deal with them on the way.
+    if (path.length === 0) path = findPath(this.map, e.pos, to);
     e.path = path;
     return path.length > 0;
   }

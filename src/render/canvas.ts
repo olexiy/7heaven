@@ -93,9 +93,13 @@ export class CanvasRenderer {
   }
 
   /** Convert a canvas client point to a tile. */
+  /** Logical viewport size (CSS pixels), valid even when the tab is hidden. */
+  private viewSize(): { w: number; h: number } {
+    return { w: this.canvas.width / this.dpr, h: this.canvas.height / this.dpr };
+  }
+
   clientToTile(cx: number, cy: number): Vec {
-    const w = this.canvas.clientWidth;
-    const h = this.canvas.clientHeight;
+    const { w, h } = this.viewSize();
     const sx = cx - w / 2 + this.camX;
     const sy = cy - h / 2 + this.camY;
     return toTile(sx, sy);
@@ -105,14 +109,13 @@ export class CanvasRenderer {
   ringHit(cx: number, cy: number, sim: Sim, alpha: number): ChannelId | null {
     const p = sim.player;
     const es = this.entityScreen(p, alpha);
-    const w = this.canvas.clientWidth;
-    const h = this.canvas.clientHeight;
+    const { w, h } = this.viewSize();
     const rx = es.sx - this.camX + w / 2;
     const ry = es.sy - ENTITY_H - 22 - this.camY + h / 2;
     const dist = Math.hypot(cx - rx, cy - ry);
     for (const c of ['hands', 'legs'] as const) {
       if (!p.action(c)) continue;
-      if (Math.abs(dist - RING_R[c]) <= RING_W + 3) return c;
+      if (Math.abs(dist - RING_R[c]) <= RING_W / 2 + 1) return c;
     }
     return null;
   }

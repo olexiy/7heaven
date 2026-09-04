@@ -34,6 +34,7 @@ class Game {
       onAction: (id) => this.selectAction(id),
       onCancel: (c) => this.cancel(c),
       onAutopilot: () => this.sim.command({ type: 'autopilot', on: !this.sim.autopilot }),
+      onAutoFast: () => (this.time.autoFast = !this.time.autoFast),
       onLeave: () => {
         this.sim.leave();
         this.hud.hideOverlay();
@@ -218,6 +219,7 @@ class Game {
     this.lastFrame = t;
     this.nowMs = t;
     const sim = this.sim;
+    this.time.calm = this.isCalm();
     const ticks = this.time.update(dt);
     for (let i = 0; i < ticks; i++) {
       const events = sim.step();
@@ -237,7 +239,18 @@ class Game {
       paused: this.time.paused,
       nowMs: t,
     });
-    this.hud.update(sim, this.time.paused, this.time.speed, this.targeting);
+    const fastNow = !this.time.paused && this.time.effectiveSpeed() > this.time.speed;
+    this.hud.update(sim, this.time.paused, this.time.speed, this.targeting, this.hover, this.time.autoFast, fastNow);
+  }
+
+  /** Calm = no enemy in sight and the player is busy with something long (walking, casting). */
+  private isCalm(): boolean {
+    const sim = this.sim;
+    if (sim.status !== 'running') return false;
+    const p = sim.player;
+    const foeVisible = sim.enemiesAlive().some((e) => p.visible.has(sim.map.idx(e.pos.x, e.pos.y)));
+    if (foeVisible) return false;
+    return p.path.length > 0 || p.isBusy();
   }
 
   private name(id: number): string {

@@ -73,7 +73,7 @@ export const ACTIONS: Record<string, ActionDef> = {
     channels: ['hands'],
     skill: 'unarmed',
     range: 1,
-    damage: [8, 14],
+    damage: [11, 19],
     noise: 2,
     phases: [{ id: 'swing', baseDuration: 1.6, interruptible: false, failBase: 0, onCancel: 'keep' }],
     color: '#c77dff',

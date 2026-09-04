@@ -50,13 +50,18 @@ export function aiStep(sim: Sim, e: Entity): void {
     return;
   }
 
-  // Ranged option while standing still and far enough.
-  if (spell && dist >= 3 && e.mana >= (spell.cost?.mana ?? 0) && e.channelsFree(spell.channels) && !e.isMoving()) {
+  // A caster stands still: walking multiplies the failure chance.
+  const casting = e.runningActions().some((a) => a.def.kind === 'spell');
+  if (casting) {
+    e.path = [];
+    return;
+  }
+
+  // Ranged option when far enough: stop walking (a pending path is dropped; a running step finishes) and cast.
+  if (spell && dist >= 3 && e.mana >= (spell.cost?.mana ?? 0) && e.channelsFree(spell.channels) && e.isChannelFree('legs')) {
+    e.path = [];
     const res = startAction(sim, e, spell, { kind: 'entity', id: target.id });
-    if (res.ok) {
-      e.path = [];
-      return;
-    }
+    if (res.ok) return;
   }
 
   // Approach.

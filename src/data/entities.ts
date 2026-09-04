@@ -17,13 +17,13 @@ export const ENTITIES: Record<string, EntitySpec> = {
     kind: 'ghoul',
     name: 'Гуль',
     faction: 'enemy',
-    maxHp: 45,
+    maxHp: 55,
     maxMana: 0,
     attributes: { str: 8, agi: 7, end: 8, int: 3, wis: 3, per: 5 },
     skills: { unarmed: 1 },
     sight: 5,
     reaction: 0.8,
-    actions: ['claw'],
+    actions: ['claw', 'kick'],
   },
   ghoulKeen: {
     kind: 'ghoulKeen',
@@ -35,6 +35,6 @@ export const ENTITIES: Record<string, EntitySpec> = {
     skills: { unarmed: 2 },
     sight: 8,
     reaction: 0.4,
-    actions: ['claw'],
+    actions: ['claw', 'kick'],
   },
 };

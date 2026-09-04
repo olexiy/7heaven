@@ -118,9 +118,11 @@ export class Entity {
     return [...seen];
   }
 
+  /** Moving = a step is running, or one is about to start (pending path with free legs). */
   isMoving(): boolean {
     const a = this.channels.get('legs');
-    return !!a && a.def.kind === 'step';
+    if (a) return a.def.kind === 'step';
+    return this.path.length > 0;
   }
 
   isBusy(): boolean {
