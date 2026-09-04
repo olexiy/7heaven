@@ -315,7 +315,7 @@ button:disabled {
 }
 
 #risk {
-  bottom: 68px;
+  bottom: 98px;
   left: 50%;
   transform: translateX(-50%);
   color: var(--warn);
@@ -360,4 +360,11 @@ button:disabled {
 
 #actions button:disabled .cd {
   opacity: 1;
+}
+
+@media (max-width: 1250px) {
+  #right {
+    top: 52px;
+    max-height: 38vh;
+  }
 }
